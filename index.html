@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Wingspan: a daily aircraft guessing game. Every wrong guess zooms the camera out.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<title>Wingspan: name the plane</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&family=Saira+Stencil+One&display=swap" rel="stylesheet">
+<style>
+/* ---------- 1. COLORS: change these and the whole site changes ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #000000; --panel: #070d24; --ink: #ffffff; --muted: #9fb0dd;
+  --accent: #3f6df5; --good: #4cc27f; --bad: #ff7b6b; --line: #16245a;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --panel: #070d24; --ink: #ffffff; --muted: #9fb0dd;
+    --accent: #3f6df5; --good: #4cc27f; --bad: #ff7b6b; --line: #16245a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --panel: #070d24; --ink: #ffffff; --muted: #9fb0dd;
+  --accent: #3f6df5; --good: #4cc27f; --bad: #ff7b6b; --line: #16245a;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "B612", system-ui, sans-serif; line-height: 1.4; }
+main { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-family: "Saira Stencil One", "Impact", sans-serif; font-weight: 400; font-size: 3rem; margin: 0; letter-spacing: .02em; }
+.sub { color: var(--muted); margin: 2px 0 16px; }
+
+/* ---------- 2. THE VIEWFINDER + HUD ---------- */
+h1 { font-size: 2.4rem; letter-spacing: .04em; }
+.bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.bar span { color: var(--muted); }
+.frame { position: relative; aspect-ratio: 3 / 2; overflow: hidden; background: #000; border-radius: 6px; }
+.frame img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .7s ease; }
+.frame::after { content: ""; position: absolute; inset: 10px; pointer-events: none; border: 2px solid rgba(255,255,255,.75);
+  clip-path: polygon(0 0, 22px 0, 22px 2px, 2px 2px, 2px 22px, 0 22px,
+    0 100%, 22px 100%, 22px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 22px), 0 calc(100% - 22px),
+    100% 100%, calc(100% - 22px) 100%, calc(100% - 22px) calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) calc(100% - 22px), 100% calc(100% - 22px),
+    100% 0, calc(100% - 22px) 0, calc(100% - 22px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 22px, 100% 22px); }
+.reticle { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; transform: translate(-50%, -50%); pointer-events: none;
+  border: 2px solid rgba(255,255,255,.65); border-radius: 50%;
+  background: linear-gradient(#fff, #fff) center / 2px 140% no-repeat, linear-gradient(#fff, #fff) center / 140% 2px no-repeat; opacity: .75; }
+.hud { position: absolute; z-index: 1; color: #fff; background: rgba(0, 12, 48, .6); backdrop-filter: blur(4px);
+  padding: 4px 10px; border-radius: 3px; font-family: "B612 Mono", "Courier New", monospace; font-weight: 700; font-size: .85rem; }
+.tl { left: 20px; top: 20px; } .bl { left: 20px; bottom: 20px; } .br { right: 20px; bottom: 20px; color: #a9c4ff; }
+.tr { right: 20px; top: 20px; display: flex; gap: 5px; padding: 10px; }
+#pips i { display: block; width: 22px; height: 6px; border-radius: 2px; background: rgba(255,255,255,.3); }
+#pips i.used { background: #ff7b6b; } #pips i.now { background: #fff; }
+
+/* ---------- 3. GUESS BOX ---------- */
+.controls { margin-top: 14px; }
+.row { display: flex; gap: 8px; }
+input { flex: 1; font: inherit; padding: 12px; border: 2px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); min-width: 0; }
+input:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button { font: inherit; font-weight: 600; padding: 12px 18px; border: 0; border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer; }
+button.alt { background: var(--panel); color: var(--ink); border: 2px solid var(--line); }
+.msg { min-height: 1.4em; color: var(--muted); margin: 8px 0 0; }
+.guesses { list-style: none; padding: 0; margin: 8px 0 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.guesses li { padding: 6px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font-size: .95rem; }
+.guesses li::before { content: "✕ "; color: var(--bad); }
+.guesses li.right { border-color: var(--good); }
+.guesses li.right::before { content: "✓ "; color: var(--good); }
+
+/* ---------- 4. REVEAL CARD ---------- */
+#reveal { background: var(--panel); border: 2px solid var(--line); border-radius: 4px; padding: 16px; }
+#reveal h2 { font-family: "Saira Stencil One", "Impact", sans-serif; font-weight: 400; font-size: 2rem; margin: 0 0 6px; }
+#reveal p { margin: 0 0 12px; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .frame img { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar"><h1>Wingspan</h1><span>Daily aircraft ID</span></div>
+
+  <div class="frame">
+    <img id="photo" alt="A zoomed-in aircraft">
+    <div class="reticle"></div>
+    <div class="hud tl" id="guessCount"></div>
+    <div class="hud tr" id="pips"></div>
+    <div class="hud bl" id="zoomRead"></div>
+    <div class="hud br" id="points"></div>
+  </div>
+
+  <div class="controls">
+    <div id="play">
+      <div class="row">
+        <input id="guess" list="planes" placeholder="Type an aircraft name" autocomplete="off" aria-label="Your guess">
+        <button id="go">Guess</button>
+      </div>
+      <datalist id="planes"></datalist>
+      <p class="msg" id="msg"></p>
+    </div>
+    <ul class="guesses" id="guesses"></ul>
+    <div id="reveal" hidden>
+      <h2 id="result"></h2>
+      <p id="fact"></p>
+      <p id="credit" style="color:var(--muted);font-size:.9rem"></p>
+      <div class="row">
+        <button id="share">Copy result</button>
+        <button class="alt" id="next">Try another puzzle</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ================================================================
+   5. THE DATA: every puzzle is just an object in this list.
+      To add a plane: add one more object. That's it.
+   - name:  the correct answer
+   - fact:  shown after the game ends
+   - focus: where the zoom starts, as [x%, y%] of the picture
+   - img:   the picture. Right now it's a drawn placeholder; later
+            this will be a file path like "photos/f16.jpg"
+   ================================================================ */
+
+// Placeholder artwork (drawn with SVG shapes) so the game works with no photos yet.
+const sky = '<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a9bd5"/><stop offset="1" stop-color="#bcdcf5"/></linearGradient></defs><rect width="800" height="500" fill="url(#s)"/><rect y="420" width="800" height="80" fill="#5b7d4f"/>';
+const wrap = body => 'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">' + sky + body + '</svg>');
+
+let windows = '';
+for (let x = 200; x < 640; x += 28) windows += `<circle cx="${x}" cy="256" r="5" fill="#2c3e50"/>`;
+const airlinerArt = wrap(`<path d="M120 270Q120 235 190 232L640 232Q700 236 725 262Q700 292 640 296L190 296Q120 296 120 270Z" fill="#f2f4f7"/>
+  <path d="M150 240L110 140L175 140L240 236Z" fill="#c0392b"/><path d="M400 285L520 385L565 385L505 285Z" fill="#cfd5dc"/>
+  <rect x="450" y="322" width="72" height="32" rx="15" fill="#8a94a0"/><path d="M660 245L695 250L702 262L655 262Z" fill="#2c3e50"/>${windows}`);
+const fighterArt = wrap(`<path d="M110 265L520 245L730 268L520 290L110 285Z" fill="#6b7785"/>
+  <path d="M130 268L100 170L170 175L230 262Z" fill="#56606c"/><path d="M380 285L470 335L515 335L475 285Z" fill="#56606c"/>
+  <ellipse cx="560" cy="250" rx="50" ry="16" fill="#1f3b57"/><path d="M420 288L520 292L520 312L430 306Z" fill="#2b2f36"/>
+  <rect x="96" y="262" width="22" height="22" fill="#ff9d4d"/>`);
+const propArt = wrap(`<path d="M180 270Q180 240 250 238L560 238Q640 240 650 275L640 295Q500 305 250 295Q180 295 180 270Z" fill="#f5f0e1"/>
+  <rect x="290" y="212" width="280" height="14" rx="6" fill="#d9d2bd"/><path d="M360 296L400 226M520 296L480 226" stroke="#8a8470" stroke-width="5"/>
+  <path d="M190 245L160 170L215 170L250 240Z" fill="#2e6da4"/><ellipse cx="656" cy="270" rx="7" ry="75" fill="#333" opacity=".75"/>
+  <circle cx="650" cy="270" r="14" fill="#c9302c"/><rect x="520" y="248" width="60" height="26" rx="4" fill="#2c3e50"/>`);
+
+const f16Photo = "photos/f16.jpg";
+
+const f22Photo = "photos/f22.jpg";
+
+const f35Photo = "photos/f35.jpg";
+
+const f18Photo = "photos/f18.jpg";
+
+const f15Photo = "photos/f15.jpg";
+
+const a10Photo = "photos/a10.jpg";
+
+const b2Photo = "photos/b2.jpg";
+
+const b52Photo = "photos/b52.jpg";
+
+const f14Photo = "photos/f14.jpg";
+const sr71Photo = "photos/sr71.jpg";
+const f4Photo = "photos/f4.jpg";
+const f117Photo = "photos/f117.jpg";
+const f86Photo = "photos/f86.jpg";
+
+const p51Photo = "photos/p51.jpg";
+const spitPhoto = "photos/spit.jpg";
+const p38Photo = "photos/p38.jpg";
+const b17Photo = "photos/b17.jpg";
+const f4uPhoto = "photos/f4u.jpg";
+const b29Photo = "photos/b29.jpg";
+const c130Photo = "photos/c130.jpg";
+const c17Photo = "photos/c17.jpg";
+const kc135Photo = "photos/kc135.jpg";
+const e3Photo = "photos/e3.jpg";
+const v22Photo = "photos/v22.jpg";
+const uh60Photo = "photos/uh60.jpg";
+const ah64Photo = "photos/ah64.jpg";
+const ch47Photo = "photos/ch47.jpg";
+const c172Photo = "photos/c172.jpg";
+const t38Photo = "photos/t38.jpg";
+const b747Photo = "photos/b747.jpg";
+
+const b1bPhoto = "photos/b1b.jpg";
+const b737Photo = "photos/b737.jpg";
+const b757Photo = "photos/b757.jpg";
+const b777Photo = "photos/b777.jpg";
+const b787Photo = "photos/b787.jpg";
+const b727Photo = "photos/b727.jpg";
+const a320Photo = "photos/a320.jpg";
+const a330Photo = "photos/a330.jpg";
+const a350Photo = "photos/a350.jpg";
+const a380Photo = "photos/a380.jpg";
+const concPhoto = "photos/conc.jpg";
+const dc3Photo = "photos/dc3.jpg";
+const md80Photo = "photos/md80.jpg";
+const crjPhoto = "photos/crj.jpg";
+const b21Photo = "photos/b21.jpg";
+const b25Photo = "photos/b25.jpg";
+const a321Photo = "photos/a321.jpg";
+const a340Photo = "photos/a340.jpg";
+const ah1Photo = "photos/ah1.jpg";
+const atrPhoto = "photos/atr.jpg";
+
+const u2Photo = "photos/u2.jpg";
+const p8Photo = "photos/p8.jpg";
+const ea18Photo = "photos/ea18.jpg";
+const g650Photo = "photos/g650.jpg";
+const c5Photo = "photos/c5.jpg";
+const t6Photo = "photos/t6.jpg";
+const kc46Photo = "photos/kc46.jpg";
+
+const puzzles = [
+  { name: "F-16 Fighting Falcon", img: f16Photo, focus: [29, 45], real: true,
+    credit: "U.S. Air Force photo by Airman Annika Schermerhorn, 64th Aggressor Squadron, Nellis AFB (public domain).",
+    fact: "The F-16 was among the first fighters with a fly-by-wire control system and a bubble canopy that gives pilots a nearly all-around view." },
+  { name: "F-22 Raptor", img: f22Photo, focus: [65, 36], real: true,
+    credit: "U.S. Air Force photo. Photographer name and source to be added.",
+    fact: "The F-22 Raptor is a stealth air-superiority fighter. Its angled twin tails and flat, faceted body are designed to scatter radar, and its engines can push it past Mach 1 without afterburner." },
+  { name: "F-35 Lightning II", img: f35Photo, focus: [22, 34], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "This is an F-35B, the version that can hover and land straight down. The open door behind the cockpit covers a lift fan, and the nozzle at the back swivels to point downward." },
+  { name: "F/A-18E/F Super Hornet", img: f18Photo, focus: [71, 38], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Super Hornet is a larger redesign of the original Hornet. A quick way to tell them apart: its engine intakes are squared off, while the original Hornet's are rounded." },
+  { name: "F-15EX Eagle II", alt: ["F-15 Eagle", "F-15E Strike Eagle"], img: f15Photo, focus: [55, 7], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F-15 has never lost a dogfight, and the F-15EX is the newest version, built to carry far more weapons than the original. Its twin tail fins are the easiest way to spot any F-15." },
+  { name: "A-10 Thunderbolt II", img: a10Photo, focus: [59, 41], real: true,
+    credit: "U.S. Air Force photo by Master Sgt. Mark Bucher. A-10 of the 104th Fighter Wing, Massachusetts Air National Guard.",
+    fact: "The A-10 is nicknamed the Warthog. Its engines sit high on the rear fuselage, away from the ground, and the whole plane was built around a giant 30 mm cannon in the nose." },
+  { name: "B-2 Spirit", img: b2Photo, focus: [33, 28], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-2 has no tail at all. Its flying-wing shape and zigzag trailing edge help it hide from radar, and only 21 were ever built." },
+  { name: "B-52 Stratofortress", img: b52Photo, focus: [53, 34], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-52 first flew in 1952, and the Air Force plans to keep flying upgraded ones for decades to come. Its eight engines hang in pairs under the wings." },
+  { name: "F-14 Tomcat", img: f14Photo, focus: [22, 33], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F-14 Tomcat\u2019s wings swing back in flight: forward for slow carrier landings, swept back for high speed." },
+  { name: "SR-71 Blackbird", img: sr71Photo, focus: [48, 45], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The SR-71 cruised above Mach 3 and higher than most aircraft can fly. Its crews relied on speed to outrun threats." },
+  { name: "F-4 Phantom II", img: f4Photo, focus: [34, 42], zooms: [8, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F-4 Phantom II flew for the Air Force, Navy, and Marines. The parachute in this photo is a drag chute that helps slow it down after landing." },
+  { name: "F-117 Nighthawk", img: f117Photo, focus: [22, 42], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F-117 Nighthawk was the first operational stealth aircraft. Its flat, angled panels bounce radar signals away instead of back to the source." },
+  { name: "F-86 Sabre", img: f86Photo, focus: [89, 43], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F-86 Sabre was a Korean War fighter, famous for its dogfights against the Soviet-built MiG-15." },
+  { name: "P-51 Mustang", img: p51Photo, focus: [52, 38], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The P-51 Mustang escorted bombers deep into Germany in WWII. Its bubble canopy gave pilots a clear view in every direction." },
+  { name: "Spitfire", img: spitPhoto, focus: [37, 24], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Spitfire’s elliptical wings gave it excellent maneuverability, and it became a symbol of Britain’s fight in the Battle of Britain." },
+  { name: "P-38 Lightning", img: p38Photo, focus: [39, 44], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The P-38 Lightning’s twin booms and central cockpit pod make it unmistakable. It was a favorite of top American aces in the Pacific." },
+  { name: "B-17 Flying Fortress", img: b17Photo, focus: [23, 38], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-17 Flying Fortress was a mainstay of the U.S. bomber force over Europe in WWII, known for its tough airframe and its tall tail fin." },
+  { name: "F4U Corsair", img: f4uPhoto, focus: [50, 40], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The F4U Corsair’s bent, gull-shaped wings let it use shorter landing gear while still clearing its huge propeller." },
+  { name: "B-29 Superfortress", img: b29Photo, focus: [15, 50], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-29 Superfortress was one of the largest and most advanced bombers of WWII, with a pressurized cabin for high-altitude flight." },
+  { name: "C-130 Hercules", img: c130Photo, focus: [69, 63], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "U.S. Air Force photo by Tech. Sgt. Howard Blair.",
+    fact: "The C-130 Hercules first flew in 1954 and is still being built today, one of the longest-running military aircraft production lines in history." },
+  { name: "C-17 Globemaster III", img: c17Photo, focus: [49, 62], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The C-17 Globemaster III carries huge loads, yet it can land on short, rough runways thanks to its powerful flaps and thrust reversers." },
+  { name: "KC-135 Stratotanker", img: kc135Photo, focus: [49, 36], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "U.S. Air Force photo by Tech. Sgt. Justin Norton.",
+    fact: "The KC-135 Stratotanker refuels other aircraft in mid-air with a telescoping boom at the tail, and it has served since the 1950s." },
+  { name: "E-3 Sentry", img: e3Photo, focus: [63, 32], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The E-3 Sentry carries a huge rotating radar dome that can track aircraft hundreds of miles away. Its body is based on the Boeing 707 airliner." },
+  { name: "V-22 Osprey", img: v22Photo, focus: [12, 25], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The V-22 Osprey takes off like a helicopter, then tilts its rotors forward and flies like an airplane." },
+  { name: "UH-60 Black Hawk", img: uh60Photo, focus: [53, 28], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The UH-60 Black Hawk has been the U.S. Army’s main utility helicopter since the 1970s." },
+  { name: "AH-64 Apache", img: ah64Photo, focus: [72, 66], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The AH-64 Apache is the Army’s main attack helicopter. The sensors in its nose help the crew find targets day or night." },
+  { name: "CH-47 Chinook", img: ch47Photo, focus: [30, 42], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photo: Cristian Schrik.",
+    fact: "The CH-47 Chinook has two rotors, one at each end, so it doesn’t need a tail rotor. It has been flying since the 1960s." },
+  { name: "Cessna 172", img: c172Photo, focus: [33, 45], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Cessna 172 is the most-produced aircraft in history, and countless pilots took their first lesson in one." },
+  { name: "T-38 Talon", img: t38Photo, focus: [9, 72], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "U.S. Air Force photo by Senior Airman Tyler McQuiston.",
+    fact: "The T-38 Talon was the world’s first supersonic trainer, and it has trained Air Force pilots since the 1960s." },
+  { name: "Boeing 747", img: b747Photo, focus: [20, 31], zooms: [9, 5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The 747 was the first wide-body airliner. Its upper-deck hump was designed so the nose could swing up for cargo loading." },
+  { name: "B-1B Lancer", img: b1bPhoto, focus: [16, 27], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-1B Lancer’s wings can sweep back for high-speed flight and forward for slow flight. Crews nicknamed it the Bone." },
+  { name: "Boeing 737", img: b737Photo, focus: [38, 58], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Boeing 737 is one of the best-selling jet airliners ever built. Its engines have flattened bottoms because the plane sits low to the ground." },
+  { name: "Boeing 757", img: b757Photo, focus: [50, 53], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Boeing 757 has a long, narrow body and powerful engines, which let it take off from short runways and still fly long routes." },
+  { name: "Boeing 777", img: b777Photo, focus: [51, 69], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Boeing 777 has some of the biggest jet engines ever put on an airliner, and each main landing gear has six wheels." },
+  { name: "Boeing 787 Dreamliner", img: b787Photo, focus: [40, 60], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Boeing 787 Dreamliner is built largely from lightweight composite materials, and its long wings flex upward noticeably in flight." },
+  { name: "Boeing 727", img: b727Photo, focus: [69, 57], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Boeing 727 is easy to spot because it has three engines mounted at the tail and a T-shaped tail." },
+  { name: "Airbus A320", img: a320Photo, focus: [93, 45], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A320 was one of the first airliners with digital fly-by-wire controls. Many have upturned wingtips called sharklets." },
+  { name: "Airbus A330", img: a330Photo, focus: [49, 45], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A330 is a twin-engine wide-body airliner with upturned winglets at the tips of its wings." },
+  { name: "Airbus A350", img: a350Photo, focus: [88, 56], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A350 is built mostly from lightweight composite materials, and its cockpit windows have a distinctive dark mask around them." },
+  { name: "Airbus A380", img: a380Photo, focus: [24, 61], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A380 is the world’s largest passenger airliner, with two full-length passenger decks and four engines." },
+  { name: "Concorde", img: concPhoto, focus: [43, 40], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "Concorde flew passengers at twice the speed of sound. Its nose drooped down for takeoff and landing so the pilots could see the runway." },
+  { name: "Douglas DC-3", img: dc3Photo, focus: [35, 63], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Douglas DC-3 made air travel practical in the 1930s, and many are still flying today." },
+  { name: "McDonnell Douglas MD-80", img: md80Photo, focus: [75, 50], zooms: [4, 2.8, 2, 1.4, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The MD-80 has two engines mounted on the rear of the fuselage and a T-shaped tail, a layout it shares with the DC-9." },
+  { name: "Bombardier CRJ-200", img: crjPhoto, focus: [68, 49], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The CRJ-200 is a small regional jet with its two engines mounted on the back of the fuselage." },
+  { name: "B-21 Raider", img: b21Photo, focus: [54, 37], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-21 Raider is the Air Force’s newest stealth bomber. It is a flying wing like the B-2, but smaller." },
+  { name: "B-25 Mitchell", img: b25Photo, focus: [84, 70], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The B-25 Mitchell is famous for the Doolittle Raid in 1942, when 16 of them launched from an aircraft carrier to bomb Japan." },
+  { name: "Airbus A321", img: a321Photo, focus: [52, 77], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A321 is the stretched version of the A320, with a longer fuselage that carries more passengers." },
+  { name: "Airbus A340", img: a340Photo, focus: [51, 58], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Airbus A340 is a four-engine airliner built for very long flights, and its extra pair of engines sets it apart from the twin-engine A330." },
+  { name: "AH-1 Cobra", img: ah1Photo, focus: [66, 56], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The AH-1 Cobra was the first dedicated attack helicopter, and its narrow body made it a smaller target." },
+  { name: "ATR 72", img: atrPhoto, focus: [60, 34], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The ATR 72 is a twin-turboprop regional airliner with a high wing. The 72 refers to its roughly 72 seats." },
+  { name: "U-2 Dragon Lady", img: u2Photo, focus: [20, 53], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The U-2 Dragon Lady is a reconnaissance aircraft that flies at around 70,000 feet. Its long, glider-like wings make it famously hard to land." },
+  { name: "P-8 Poseidon", img: p8Photo, focus: [24, 13], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The P-8 Poseidon is built from a Boeing 737 airliner and hunts submarines for the Navy. Its raked wingtips set it apart from a regular 737." },
+  { name: "EA-18G Growler", img: ea18Photo, focus: [10, 27], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The EA-18G Growler is an electronic-warfare version of the Super Hornet. The pods on its wingtips help it detect and jam enemy radar." },
+  { name: "Gulfstream G650", img: g650Photo, focus: [33, 59], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The Gulfstream G650 is a long-range business jet known for its large oval windows." },
+  { name: "C-5 Galaxy", img: c5Photo, focus: [22, 60], zooms: [5, 3.5, 2.5, 1.6, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The C-5 Galaxy is one of the largest aircraft in the U.S. military. Its nose lifts up so cargo can be loaded from the front." },
+  { name: "T-6 Texan II", img: t6Photo, focus: [50, 36], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The T-6 Texan II is a turboprop trainer used to teach new Air Force and Navy pilots. Its two seats sit one behind the other under a big bubble canopy." },
+  { name: "KC-46 Pegasus", img: kc46Photo, focus: [88, 53], zooms: [7, 4.5, 3, 1.8, 1], real: true,
+    credit: "Photographer and source to be added.",
+    fact: "The KC-46 Pegasus is built from a Boeing 767 airliner and refuels other aircraft in mid-air using a boom at the tail and pods on its wings." },
+];
+
+// Only puzzles with real photos are playable. Placeholder-art puzzles stay in the list but are skipped.
+// Scramble the order once. The shuffle is "seeded", so every player gets the same scrambled order.
+function seededShuffle(arr, seed) {
+  const a = arr.slice(); let s = seed;
+  const rnd = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const live = seededShuffle(puzzles.filter(p => p.real), 2026);
+
+// Extra names so the autocomplete list has plenty of wrong options too.
+const extras = [
+  // US jets
+  "F-22 Raptor", "F-35 Lightning II", "F-15 Eagle", "F-15E Strike Eagle", "F-15EX Eagle II", "F-14 Tomcat", "F/A-18 Hornet", "F/A-18E/F Super Hornet",
+  "F-4 Phantom II", "F-86 Sabre", "F-117 Nighthawk", "F-111 Aardvark", "F-105 Thunderchief", "F-104 Starfighter", "F-5 Tiger II",
+  "F-8 Crusader", "A-10 Thunderbolt II", "A-4 Skyhawk", "A-6 Intruder", "AV-8B Harrier II", "EA-18G Growler", "P-80 Shooting Star",
+  // WWII and earlier
+  "P-51 Mustang", "P-47 Thunderbolt", "P-38 Lightning", "P-40 Warhawk", "F4F Wildcat", "F6F Hellcat", "F4U Corsair",
+  "B-17 Flying Fortress", "B-24 Liberator", "B-25 Mitchell", "B-29 Superfortress", "SBD Dauntless", "TBF Avenger", "C-47 Skytrain",
+  "Spitfire", "Hawker Hurricane", "Messerschmitt Bf 109", "Focke-Wulf Fw 190", "Mitsubishi A6M Zero", "Avro Lancaster",
+  "de Havilland Mosquito", "Junkers Ju 87 Stuka", "Wright Flyer", "Spirit of St. Louis", "Bell X-1", "X-15",
+  // Bombers and special missions
+  "B-52 Stratofortress", "B-1B Lancer", "B-2 Spirit", "B-21 Raider", "B-36 Peacemaker", "SR-71 Blackbird", "U-2 Dragon Lady", "AC-130 Spectre",
+  // Transports, tankers, patrol
+  "C-130 Hercules", "C-17 Globemaster III", "C-5 Galaxy", "C-141 Starlifter", "C-2 Greyhound", "KC-135 Stratotanker", "KC-46 Pegasus",
+  "E-3 Sentry", "E-2 Hawkeye", "P-8 Poseidon", "P-3 Orion",
+  // Helicopters
+  "UH-60 Black Hawk", "AH-64 Apache", "UH-1 Huey", "CH-47 Chinook", "AH-1 Cobra", "CH-53 Sea Stallion", "MH-60 Seahawk",
+  "V-22 Osprey", "OH-58 Kiowa", "Bell 206 JetRanger", "Robinson R44",
+  // Trainers
+  "T-6 Texan II", "T-38 Talon", "T-45 Goshawk", "T-34 Mentor", "T-28 Trojan",
+  // Airliners and civil
+  "Boeing 737", "Boeing 757", "Boeing 767", "Boeing 777", "Boeing 787 Dreamliner", "Airbus A320", "Airbus A330", "Airbus A350",
+  "Airbus A380", "Concorde", "Douglas DC-3", "McDonnell Douglas MD-80", "Lockheed L-1011 TriStar", "Embraer E175", "Embraer E190", "Bombardier CRJ-200", "Boeing 707", "Boeing 727", "Airbus A220", "Airbus A321", "Airbus A340", "ATR 72", "Dash 8 Q400", "Boeing 717",
+  "Cessna 150", "Cessna 182 Skylane", "Piper Cub", "Piper PA-28 Cherokee", "Beechcraft Bonanza", "Cirrus SR22", "Diamond DA40",
+  "Mooney M20", "de Havilland Beaver", "Pilatus PC-12", "Learjet 45", "Gulfstream G650",
+  // World jets
+  "Eurofighter Typhoon", "Dassault Rafale", "Saab Gripen", "Su-27 Flanker", "Su-57 Felon", "MiG-15", "MiG-21", "MiG-29 Fulcrum"
+];
+
+/* ================================================================
+   6. THE GAME RULES
+   ================================================================ */
+const DEFAULT_ZOOMS = [10, 5, 3, 1.8, 1];  // zoom level for guess 1, 2, 3, 4, 5
+let ZOOMS = DEFAULT_ZOOMS;               // a puzzle can override this with its own "zooms" list
+const MAX = DEFAULT_ZOOMS.length;
+
+let puzzle, guessNum, over, history;
+const $ = id => document.getElementById(id);
+
+// Fill the autocomplete dropdown with every aircraft name.
+const allNames = [...new Set(puzzles.map(p => p.name).concat(extras))].sort();  // Set removes duplicates
+$("planes").innerHTML = allNames.map(n => `<option value="${n}">`).join("");
+
+// Pick today's puzzle: count days since 1970, then use the remainder after dividing by the number of puzzles.
+// Same number for everyone on the same day = same puzzle for everyone.
+function todaysIndex() { return Math.floor(Date.now() / 86400000) % live.length; }
+
+function startGame(index) {
+  puzzle = live[index];
+  ZOOMS = puzzle.zooms || DEFAULT_ZOOMS;
+  guessNum = 1; over = false; history = [];
+  $("photo").onload = e => { $("photo").parentElement.style.aspectRatio = e.target.naturalWidth + " / " + e.target.naturalHeight; };
+  $("photo").src = puzzle.img;
+  $("guesses").innerHTML = "";
+  $("reveal").hidden = true; $("play").hidden = false;
+  $("guess").value = ""; $("msg").textContent = "";
+  $("photo").style.transition = "none";   // jump straight to the zoomed-in view (no zoom-in animation on a new puzzle)
+  zoomTo(ZOOMS[0]); updateStatus();
+  void $("photo").offsetWidth;            // make the browser apply it right now
+  $("photo").style.transition = "";
+}
+
+// The core trick: scale the picture up, and keep the zoom "anchored" on the interesting spot.
+function zoomTo(z) {
+  const img = $("photo");
+  img.style.transformOrigin = puzzle.focus[0] + "% " + puzzle.focus[1] + "%";
+  img.style.transform = "scale(" + z + ")";
+}
+
+function updateStatus() {
+  const n = Math.min(guessNum, MAX), pts = MAX - n + 1;
+  $("guessCount").textContent = "Guess " + n + " of " + MAX;
+  $("points").textContent = pts + (pts === 1 ? " point" : " points");
+  $("zoomRead").textContent = ZOOMS[n - 1] + "× zoom";
+  $("pips").innerHTML = ZOOMS.map((z, i) => '<i class="' + (i < n - 1 ? "used" : i === n - 1 ? "now" : "") + '"></i>').join("");
+}
+
+// A guess is right if it matches the name or any accepted alternate answer (puzzle.alt).
+function isRight(n) { return n === puzzle.name || (puzzle.alt || []).includes(n); }
+
+function submitGuess() {
+  if (over) return;
+  const raw = $("guess").value.trim();
+  const match = allNames.find(n => n.toLowerCase() === raw.toLowerCase());
+  if (!match) { $("msg").textContent = "Pick an aircraft from the suggestion list."; return; }
+  if (history.includes(match)) { $("msg").textContent = "You already guessed that one."; return; }
+
+  history.push(match);
+  const right = isRight(match);
+  const li = document.createElement("li");
+  li.textContent = match;
+  if (right) li.className = "right";
+  $("guesses").appendChild(li);
+  $("guess").value = ""; $("msg").textContent = "";
+
+  if (right) return finish(true);
+  if (guessNum === MAX) return finish(false);
+  guessNum++;
+  zoomTo(ZOOMS[guessNum - 1]);   // wrong guess: pull the camera back one step
+  updateStatus();
+}
+
+function finish(won) {
+  over = true;
+  zoomTo(1);                      // show the whole plane
+  $("zoomRead").textContent = "1× zoom";
+  $("play").hidden = true;
+  $("reveal").hidden = false;
+  const score = won ? MAX - guessNum + 1 : 0;
+  $("result").textContent = won ? "It was the " + puzzle.name + ". You scored " + score + "/" + MAX + "." : "It was the " + puzzle.name + ".";
+  $("fact").textContent = puzzle.fact;
+  $("credit").textContent = puzzle.credit || "";
+  const squares = history.map(h => isRight(h) ? "🟩" : "🟥").join("");
+  $("share").dataset.text = "Wingspan " + (won ? guessNum : "X") + "/" + MAX + "\n" + squares;
+}
+
+$("go").onclick = submitGuess;
+$("guess").addEventListener("keydown", e => { if (e.key === "Enter") submitGuess(); });
+$("share").onclick = async () => {
+  try { await navigator.clipboard.writeText($("share").dataset.text); $("share").textContent = "Copied"; }
+  catch (e) { $("share").textContent = "Copy failed"; }
+};
+// "Try another puzzle" is for testing now; the real daily game would show one puzzle per day.
+let testIndex = 0; // Testing only: swap back to todaysIndex() when the game goes live.
+$("next").onclick = () => { testIndex = (testIndex + 1) % live.length; $("share").textContent = "Copy result"; startGame(testIndex); };
+
+startGame(testIndex);
+</script>
+</body>
+</html>
