@@ -110,6 +110,7 @@ button.alt { background: var(--panel); color: var(--ink); border: 2px solid var(
       </div>
     </div>
   </div>
+  <p style="color:var(--muted);font-size:.8rem;margin-top:28px">Site version 3</p>
 </main>
 
 <script>
@@ -120,7 +121,7 @@ button.alt { background: var(--panel); color: var(--ink); border: 2px solid var(
    - fact:  shown after the game ends
    - focus: where the zoom starts, as [x%, y%] of the picture
    - img:   the picture. Right now it's a drawn placeholder; later
-            this will be a file path like "photos/f16.jpg"
+            this will be a file path like "f16.jpg"
    ================================================================ */
 
 // Placeholder artwork (drawn with SVG shapes) so the game works with no photos yet.
@@ -142,74 +143,74 @@ const propArt = wrap(`<path d="M180 270Q180 240 250 238L560 238Q640 240 650 275L
   <path d="M190 245L160 170L215 170L250 240Z" fill="#2e6da4"/><ellipse cx="656" cy="270" rx="7" ry="75" fill="#333" opacity=".75"/>
   <circle cx="650" cy="270" r="14" fill="#c9302c"/><rect x="520" y="248" width="60" height="26" rx="4" fill="#2c3e50"/>`);
 
-const f16Photo = "photos/f16.jpg";
+const f16Photo = "f16.jpg";
 
-const f22Photo = "photos/f22.jpg";
+const f22Photo = "f22.jpg";
 
-const f35Photo = "photos/f35.jpg";
+const f35Photo = "f35.jpg";
 
-const f18Photo = "photos/f18.jpg";
+const f18Photo = "f18.jpg";
 
-const f15Photo = "photos/f15.jpg";
+const f15Photo = "f15.jpg";
 
-const a10Photo = "photos/a10.jpg";
+const a10Photo = "a10.jpg";
 
-const b2Photo = "photos/b2.jpg";
+const b2Photo = "b2.jpg";
 
-const b52Photo = "photos/b52.jpg";
+const b52Photo = "b52.jpg";
 
-const f14Photo = "photos/f14.jpg";
-const sr71Photo = "photos/sr71.jpg";
-const f4Photo = "photos/f4.jpg";
-const f117Photo = "photos/f117.jpg";
-const f86Photo = "photos/f86.jpg";
+const f14Photo = "f14.jpg";
+const sr71Photo = "sr71.jpg";
+const f4Photo = "f4.jpg";
+const f117Photo = "f117.jpg";
+const f86Photo = "f86.jpg";
 
-const p51Photo = "photos/p51.jpg";
-const spitPhoto = "photos/spit.jpg";
-const p38Photo = "photos/p38.jpg";
-const b17Photo = "photos/b17.jpg";
-const f4uPhoto = "photos/f4u.jpg";
-const b29Photo = "photos/b29.jpg";
-const c130Photo = "photos/c130.jpg";
-const c17Photo = "photos/c17.jpg";
-const kc135Photo = "photos/kc135.jpg";
-const e3Photo = "photos/e3.jpg";
-const v22Photo = "photos/v22.jpg";
-const uh60Photo = "photos/uh60.jpg";
-const ah64Photo = "photos/ah64.jpg";
-const ch47Photo = "photos/ch47.jpg";
-const c172Photo = "photos/c172.jpg";
-const t38Photo = "photos/t38.jpg";
-const b747Photo = "photos/b747.jpg";
+const p51Photo = "p51.jpg";
+const spitPhoto = "spit.jpg";
+const p38Photo = "p38.jpg";
+const b17Photo = "b17.jpg";
+const f4uPhoto = "f4u.jpg";
+const b29Photo = "b29.jpg";
+const c130Photo = "c130.jpg";
+const c17Photo = "c17.jpg";
+const kc135Photo = "kc135.jpg";
+const e3Photo = "e3.jpg";
+const v22Photo = "v22.jpg";
+const uh60Photo = "uh60.jpg";
+const ah64Photo = "ah64.jpg";
+const ch47Photo = "ch47.jpg";
+const c172Photo = "c172.jpg";
+const t38Photo = "t38.jpg";
+const b747Photo = "b747.jpg";
 
-const b1bPhoto = "photos/b1b.jpg";
-const b737Photo = "photos/b737.jpg";
-const b757Photo = "photos/b757.jpg";
-const b777Photo = "photos/b777.jpg";
-const b787Photo = "photos/b787.jpg";
-const b727Photo = "photos/b727.jpg";
-const a320Photo = "photos/a320.jpg";
-const a330Photo = "photos/a330.jpg";
-const a350Photo = "photos/a350.jpg";
-const a380Photo = "photos/a380.jpg";
-const concPhoto = "photos/conc.jpg";
-const dc3Photo = "photos/dc3.jpg";
-const md80Photo = "photos/md80.jpg";
-const crjPhoto = "photos/crj.jpg";
-const b21Photo = "photos/b21.jpg";
-const b25Photo = "photos/b25.jpg";
-const a321Photo = "photos/a321.jpg";
-const a340Photo = "photos/a340.jpg";
-const ah1Photo = "photos/ah1.jpg";
-const atrPhoto = "photos/atr.jpg";
+const b1bPhoto = "b1b.jpg";
+const b737Photo = "b737.jpg";
+const b757Photo = "b757.jpg";
+const b777Photo = "b777.jpg";
+const b787Photo = "b787.jpg";
+const b727Photo = "b727.jpg";
+const a320Photo = "a320.jpg";
+const a330Photo = "a330.jpg";
+const a350Photo = "a350.jpg";
+const a380Photo = "a380.jpg";
+const concPhoto = "conc.jpg";
+const dc3Photo = "dc3.jpg";
+const md80Photo = "md80.jpg";
+const crjPhoto = "crj.jpg";
+const b21Photo = "b21.jpg";
+const b25Photo = "b25.jpg";
+const a321Photo = "a321.jpg";
+const a340Photo = "a340.jpg";
+const ah1Photo = "ah1.jpg";
+const atrPhoto = "atr.jpg";
 
-const u2Photo = "photos/u2.jpg";
-const p8Photo = "photos/p8.jpg";
-const ea18Photo = "photos/ea18.jpg";
-const g650Photo = "photos/g650.jpg";
-const c5Photo = "photos/c5.jpg";
-const t6Photo = "photos/t6.jpg";
-const kc46Photo = "photos/kc46.jpg";
+const u2Photo = "u2.jpg";
+const p8Photo = "p8.jpg";
+const ea18Photo = "ea18.jpg";
+const g650Photo = "g650.jpg";
+const c5Photo = "c5.jpg";
+const t6Photo = "t6.jpg";
+const kc46Photo = "kc46.jpg";
 
 const puzzles = [
   { name: "F-16 Fighting Falcon", img: f16Photo, focus: [29, 45], real: true,
@@ -449,6 +450,12 @@ function startGame(index) {
   ZOOMS = puzzle.zooms || DEFAULT_ZOOMS;
   guessNum = 1; over = false; history = [];
   $("photo").onload = e => { $("photo").parentElement.style.aspectRatio = e.target.naturalWidth + " / " + e.target.naturalHeight; };
+  // If the photo isn't found at one path, try the other (loose in the repo vs. inside a "photos" folder).
+  delete $("photo").dataset.alt;
+  $("photo").onerror = () => { const ph = $("photo");
+    if (ph.dataset.alt) { $("msg").textContent = "Photo not found. The page looked for: " + ph.getAttribute("src"); return; }
+    ph.dataset.alt = "1";
+    ph.src = puzzle.img.indexOf("photos/") === 0 ? puzzle.img.slice(7) : "photos/" + puzzle.img; };
   $("photo").src = puzzle.img;
   $("guesses").innerHTML = "";
   $("reveal").hidden = true; $("play").hidden = false;
