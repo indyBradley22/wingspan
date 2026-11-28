@@ -74,14 +74,21 @@ button.alt { background: var(--panel); color: var(--ink); border: 2px solid var(
 #reveal h2 { font-family: "Saira Stencil One", "Impact", sans-serif; font-weight: 400; font-size: 2rem; margin: 0 0 6px; }
 #reveal p { margin: 0 0 12px; }
 [hidden] { display: none !important; }
+#summary { background: var(--panel); border: 2px solid var(--line); border-radius: 4px; padding: 16px; margin-top: 14px; }
+#summary h2 { font-family: "Saira Stencil One", "Impact", sans-serif; font-weight: 400; font-size: 2rem; margin: 0 0 6px; }
+#sumScore { font-family: "Saira Stencil One", "Impact", sans-serif; font-size: 3.2rem; margin: 0; color: var(--accent); }
+.sumlist { list-style: none; padding: 0; margin: 8px 0 12px; }
+.sumlist li { padding: 8px 12px; margin-bottom: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; }
+.sumstreak { margin: 0 0 6px; font-weight: 700; }
+.muted { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .frame img { transition: none; } }
 </style>
 </head>
 <body>
 <main>
-  <div class="bar"><h1>Wingspan</h1><span>Daily aircraft ID</span></div>
+  <div class="bar"><h1>Wingspan</h1><span id="dayInfo">Daily aircraft ID</span></div>
 
-  <div class="frame">
+  <div class="frame" id="frame">
     <img id="photo" alt="A zoomed-in aircraft">
     <div class="reticle"></div>
     <div class="hud tl" id="guessCount"></div>
@@ -106,11 +113,22 @@ button.alt { background: var(--panel); color: var(--ink); border: 2px solid var(
       <p id="credit" style="color:var(--muted);font-size:.9rem"></p>
       <div class="row">
         <button id="share">Copy result</button>
-        <button class="alt" id="next">Try another puzzle</button>
+        <button class="alt" id="next">Next plane</button>
+        <button class="alt" id="toSum" hidden>Back to today’s planes</button>
       </div>
     </div>
   </div>
-  <p style="color:var(--muted);font-size:.8rem;margin-top:28px">Site version 3</p>
+  <div id="summary" hidden>
+    <h2>Today’s planes</h2>
+    <p id="sumScore"></p>
+    <ul class="sumlist" id="sumList"></ul>
+    <p class="sumstreak" id="sumStreak"></p>
+    <p class="muted">Come back tomorrow for 3 new planes.</p>
+    <div class="row">
+      <button id="sumShare">Copy result</button>
+      <button class="alt" id="sumPractice">Practice with a random plane</button>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -441,9 +459,33 @@ const $ = id => document.getElementById(id);
 const allNames = [...new Set(puzzles.map(p => p.name).concat(extras))].sort();  // Set removes duplicates
 $("planes").innerHTML = allNames.map(n => `<option value="${n}">`).join("");
 
-// Pick today's puzzle: count days since 1970, then use the remainder after dividing by the number of puzzles.
-// Same number for everyone on the same day = same puzzle for everyone.
-function todaysIndex() { return Math.floor(Date.now() / 86400000) % live.length; }
+/* ================================================================
+   DAILY MODE: 3 planes a day, the same 3 for everyone
+   ================================================================ */
+const DAILY = 3;                                   // planes per day
+const SAVE_KEY = "wingspan.save.v1";               // where progress is stored in the player's browser
+// Testing trick: add ?day=1 to the web address to preview tomorrow's planes (nothing is saved in that mode).
+const dayOffset = Number(new URLSearchParams(location.search).get("day")) || 0;
+const TESTING = dayOffset !== 0;
+// Day number = days since 1970 on the player's own clock, so new planes appear at their local midnight.
+const today = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000) + dayOffset;
+// Which puzzle is plane #slot (0, 1, 2) today? Same math for everyone, so everyone gets the same three.
+const dailyIndex = slot => (today * DAILY + slot) % live.length;
+
+function loadSave() { if (TESTING) return {}; try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
+function writeSave() { if (TESTING) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+let save = loadSave();
+if (save.day !== today) save = { day: today, results: [], streak: save.streak || 0, lastDone: save.lastDone };   // new day, fresh planes
+if (save.lastDone != null && save.lastDone < today - 1) save.streak = 0;                                       // missed a day: streak resets
+writeSave();
+
+let mode = "daily";                                // "daily" (counts) or "practice" (doesn't count)
+
+function updateDayInfo() {
+  $("dayInfo").textContent = mode === "practice" ? "Practice (doesn’t count)" :
+    "Plane " + Math.min(save.results.length + 1, DAILY) + " of " + DAILY + (save.streak ? " · 🔥 " + save.streak : "");
+}
 
 function startGame(index) {
   puzzle = live[index];
@@ -464,6 +506,7 @@ function startGame(index) {
   zoomTo(ZOOMS[0]); updateStatus();
   void $("photo").offsetWidth;            // make the browser apply it right now
   $("photo").style.transition = "";
+  updateDayInfo();
 }
 
 // The core trick: scale the picture up, and keep the zoom "anchored" on the interesting spot.
@@ -484,26 +527,38 @@ function updateStatus() {
 // A guess is right if it matches the name or any accepted alternate answer (puzzle.alt).
 function isRight(n) { return n === puzzle.name || (puzzle.alt || []).includes(n); }
 
-function submitGuess() {
-  if (over) return;
-  const raw = $("guess").value.trim();
-  const match = allNames.find(n => n.toLowerCase() === raw.toLowerCase());
-  if (!match) { $("msg").textContent = "Pick an aircraft from the suggestion list."; return; }
-  if (history.includes(match)) { $("msg").textContent = "You already guessed that one."; return; }
-
+// Apply one (already checked) guess.
+function applyGuess(match) {
   history.push(match);
   const right = isRight(match);
   const li = document.createElement("li");
   li.textContent = match;
   if (right) li.className = "right";
   $("guesses").appendChild(li);
-  $("guess").value = ""; $("msg").textContent = "";
-
   if (right) return finish(true);
   if (guessNum === MAX) return finish(false);
   guessNum++;
   zoomTo(ZOOMS[guessNum - 1]);   // wrong guess: pull the camera back one step
   updateStatus();
+}
+
+function submitGuess() {
+  if (over) return;
+  const raw = $("guess").value.trim();
+  const match = allNames.find(n => n.toLowerCase() === raw.toLowerCase());
+  if (!match) { $("msg").textContent = "Pick an aircraft from the suggestion list."; return; }
+  if (history.includes(match)) { $("msg").textContent = "You already guessed that one."; return; }
+  $("guess").value = ""; $("msg").textContent = "";
+  applyGuess(match);
+  if (mode === "daily" && !over) { save.current = { slot: save.results.length, history: history.slice() }; writeSave(); }   // remember progress if the page is refreshed
+}
+
+// If the page was refreshed in the middle of a plane, put the earlier guesses back.
+function restoreProgress() {
+  if (mode !== "daily" || !save.current || save.current.slot !== save.results.length) return;
+  const img = $("photo"); img.style.transition = "none";
+  save.current.history.forEach(g => { if (!over) applyGuess(g); });
+  void img.offsetWidth; img.style.transition = "";
 }
 
 function finish(won) {
@@ -518,6 +573,17 @@ function finish(won) {
   $("credit").textContent = puzzle.credit || "";
   const squares = history.map(h => isRight(h) ? "🟩" : "🟥").join("");
   $("share").dataset.text = "Wingspan " + (won ? guessNum : "X") + "/" + MAX + "\n" + squares;
+  if (mode === "daily") {                        // save this plane's result
+    save.results.push({ name: puzzle.name, score: score, won: won, tries: won ? guessNum : 0, squares: squares });
+    delete save.current;
+    if (save.results.length === DAILY && save.lastDone !== today) {      // all three done: update the streak
+      save.streak = (save.lastDone === today - 1 ? save.streak : 0) + 1; save.lastDone = today;
+    }
+    writeSave();
+  }
+  $("next").textContent = mode === "practice" ? "Another plane" : (save.results.length < DAILY ? "Next plane" : "See today’s score");
+  $("toSum").hidden = mode !== "practice";
+  updateDayInfo();
 }
 
 $("go").onclick = submitGuess;
@@ -526,11 +592,53 @@ $("share").onclick = async () => {
   try { await navigator.clipboard.writeText($("share").dataset.text); $("share").textContent = "Copied"; }
   catch (e) { $("share").textContent = "Copy failed"; }
 };
-// "Try another puzzle" is for testing now; the real daily game would show one puzzle per day.
-let testIndex = 0; // Testing only: swap back to todaysIndex() when the game goes live.
-$("next").onclick = () => { testIndex = (testIndex + 1) % live.length; $("share").textContent = "Copy result"; startGame(testIndex); };
+function showScreen(name) {                      // "game" or "summary"
+  $("frame").hidden = name !== "game";
+  document.querySelector(".controls").hidden = name !== "game";
+  $("summary").hidden = name !== "summary";
+}
 
-startGame(testIndex);
+function showSummary() {
+  showScreen("summary");
+  const total = save.results.reduce((sum, r) => sum + r.score, 0), out = DAILY * MAX;
+  $("dayInfo").textContent = "Done for today ✓";
+  $("sumScore").textContent = total + " / " + out;
+  $("sumList").innerHTML = save.results.map(r => "<li>" + (r.won ? "🟩 " : "🟥 ") + r.name + " · " + r.score + "/" + MAX + "</li>").join("");
+  $("sumStreak").textContent = "🔥 " + save.streak + (save.streak === 1 ? " day" : " days") + " in a row";
+  $("sumShare").textContent = "Copy result";
+  $("sumShare").dataset.text = "Wingspan " + total + "/" + out + (save.streak > 1 ? "  🔥" + save.streak : "") + "\n" +
+    save.results.map(r => (r.won ? r.tries : "X") + "/" + MAX + " " + r.squares).join("\n");
+}
+
+function startDaily() {
+  mode = "daily";
+  if (save.results.length >= DAILY) return showSummary();
+  showScreen("game");
+  $("share").textContent = "Copy result";
+  startGame(dailyIndex(save.results.length));
+  restoreProgress();
+}
+
+function startPractice() {
+  mode = "practice";
+  showScreen("game");
+  $("share").textContent = "Copy result";
+  startGame(Math.floor(Math.random() * live.length));
+}
+
+$("next").onclick = () => {
+  if (mode === "practice") return startPractice();
+  if (save.results.length < DAILY) return startDaily();
+  showSummary();
+};
+$("toSum").onclick = startDaily;
+$("sumPractice").onclick = startPractice;
+$("sumShare").onclick = async () => {
+  try { await navigator.clipboard.writeText($("sumShare").dataset.text); $("sumShare").textContent = "Copied"; }
+  catch (e) { $("sumShare").textContent = "Copy failed"; }
+};
+
+startDaily();
 </script>
 </body>
 </html>
